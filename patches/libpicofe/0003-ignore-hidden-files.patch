@@ -1,0 +1,14 @@
+diff --git a/menu.c b/menu.c
+index e91f84a80f1857233090ec588939dc42c39682d0..5a4bcd0181b12dccc55004ed7edbf4c93adad793 100644
+--- a/menu.c
++++ b/menu.c
+@@ -977,6 +977,9 @@ static int scandir_filter(const struct dirent *ent)
+ 		return 1;
+ 	}
+ 
++	if (ent->d_name[0]=='.')
++		return 0;
++
+ 	ext = strrchr(ent->d_name, '.');
+ 	if (ext == NULL)
+ 		return 0;

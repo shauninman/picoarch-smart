@@ -1,0 +1,13 @@
+diff --git a/menu.c b/menu.c
+index 5a4bcd0181b12dccc55004ed7edbf4c93adad793..685850537afd2c1ace97ae757fd5e5989eec4d02 100644
+--- a/menu.c
++++ b/menu.c
+@@ -1181,7 +1181,7 @@ rescan:
+ 		}
+ 		else if (inp & PBTN_CHAR) {
+ 			// must be last
+-			sel = dirent_seek_char(namelist, n, sel, cinp);
++			// sel = dirent_seek_char(namelist, n, sel, cinp); // crashes with R on trimui smart
+ 		}
+ 
+ 		if (inp & PBTN_MBACK)
