@@ -489,6 +489,10 @@ int plat_init(void)
 {
 	plat_sound_write = plat_sound_write_nearest;
 
+	// for trimui smart
+	putenv("SDL_VIDEO_FBCON_ROTATION=CCW");
+	putenv("SDL_USE_PAN=true");
+	
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP * 8, SDL_SWSURFACE);
 	if (screen == NULL) {
