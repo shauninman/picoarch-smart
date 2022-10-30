@@ -527,6 +527,7 @@ int main(int argc, char **argv) {
 	}
 	
 	recents_load(); // used by recent menu and quicksaves
+	int quicksave_loaded = quicksave_load();
 	
 	if (core_path[0]=='\0') {
 		if (argc > 1 && argv[1]) {
@@ -584,7 +585,11 @@ int main(int argc, char **argv) {
 	}
 #endif
 	show_startup_message();
+	
+	int last_slot = state_slot;
+	if (quicksave_loaded) resume_slot = 99;
 	state_resume();
+	if (quicksave_loaded) state_slot = last_slot;
 
 	do {
 		count_fps();

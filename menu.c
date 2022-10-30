@@ -32,6 +32,7 @@ typedef enum
 	MA_MAIN_CONTENT_SEL,
 	MA_MAIN_RESET_GAME,
 	MA_MAIN_CREDITS,
+	MA_MAIN_QUICKSAVE,
 	MA_MAIN_EXIT,
 	MA_OPT_CORE_OPTS,
 	MA_OPT_SAVECFG,
@@ -671,6 +672,25 @@ static int menu_loop_options(int id, int keys)
 	return 0;
 }
 
+static int menu_loop_quicksave() {
+	
+	draw_menu_message("Creating quicksave...", NULL);
+	quicksave_save();
+	sleep(1);
+	
+	// TODO: figure out how to blank the screen
+	// memset(g_menuscreen_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	// memset(g_menubg_src_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	// memset(g_menubg_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	// plat_video_clear();
+	// plat_video_flip();
+
+	draw_menu_message("It is now safe\nto power off.", NULL);
+	for (;;) {} // wait for poweroff
+
+	return 0;
+}
+
 static int main_menu_handler(int id, int keys)
 {
 	switch (id)
@@ -683,6 +703,9 @@ static int main_menu_handler(int id, int keys)
 		return menu_loop_savestate(1,state_slot);
 	case MA_MAIN_RESET_GAME:
 		current_core.retro_reset();
+		return 1;
+	case MA_MAIN_QUICKSAVE:
+		menu_loop_quicksave();
 		return 1;
 	case MA_MAIN_EXIT:
 		should_quit = 1;
@@ -705,6 +728,7 @@ static menu_entry e_menu_main[] =
 	mee_handler   ("Options",            menu_loop_options),
 	mee_handler_id("Reset game",         MA_MAIN_RESET_GAME,  main_menu_handler),
 	mee_handler_id("Load new game",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
+	mee_handler_id("Quicksave",          MA_MAIN_QUICKSAVE,   main_menu_handler),
 	mee_handler_id("Exit",               MA_MAIN_EXIT,        main_menu_handler),
 	mee_end,
 };
@@ -758,6 +782,7 @@ void menu_loop(void)
 
 	me_enable(e_menu_main, MA_MAIN_SAVE_STATE, state_allowed());
 	me_enable(e_menu_main, MA_MAIN_LOAD_STATE, state_allowed());
+	me_enable(e_menu_main, MA_MAIN_QUICKSAVE, state_allowed());
 	me_enable(e_menu_main, MA_MAIN_CHEATS, cheats != NULL);
 
 	me_enable(e_menu_main, MA_MAIN_DISC_CTRL, needs_disc_ctrl);

@@ -15,4 +15,7 @@ extern struct recent recents[MAX_RECENTS];
 void recents_load(void);
 void recents_add(const char* core_path, const char* content_path);
 
+void quicksave_save(void);
+int quicksave_load(void);
+
 #endif

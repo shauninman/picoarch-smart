@@ -80,3 +80,30 @@ void recents_add(const char* core_path, const char* content_path) {
 		fclose(file);
 	}
 }
+
+void quicksave_save(void) {
+	int last_slot = state_slot;
+	state_slot = 99;
+	state_write();
+	state_slot = last_slot;
+	
+	char quicksave_path[MAX_PATH];
+	sprintf(quicksave_path, "%s/.picoarch/qs", getenv("HOME"));
+	
+	file_put_int(quicksave_path, 99);
+	sync();
+}
+int quicksave_load(void) {
+	char quicksave_path[MAX_PATH];
+	sprintf(quicksave_path, "%s/.picoarch/qs", getenv("HOME"));
+	
+	if (!file_exists(quicksave_path)) return 0;
+	remove(quicksave_path);
+	
+	if (!recents_len) return 0;
+	struct recent* item = &recents[0];
+	strcpy(core_path, item->core_path);
+	strcpy(content_path, item->content_path);
+	
+	return 1;
+}
