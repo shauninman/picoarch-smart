@@ -5,6 +5,7 @@
 #include "options.h"
 #include "overrides.h"
 #include "plat.h"
+#include "recents.h"
 #include "scale.h"
 #include "util.h"
 
@@ -155,7 +156,16 @@ static int mh_set_core(int id, int keys) {
 }
 
 static int core_selector(const struct dirent *ent) {
+	if (!ent || ent->d_name[0]=='.') return 0;
 	return has_suffix_i(ent->d_name, "_libretro.so");
+}
+
+static int core_sorter(const struct dirent **d1, const struct dirent **d2) {
+	const struct dirent* a = *d1;
+	const struct dirent* b = *d2;
+	if (string_match(a->d_name, "recent_libretro.so")) return -1;
+	else if (string_match(b->d_name, "recent_libretro.so")) return 1;
+	else return alphasort(&a, &b);
 }
 
 static int menu_loop_core_page(int offset, int keys) {
@@ -172,7 +182,7 @@ static int menu_loop_core_page(int offset, int keys) {
 		core_extract_name(ent->d_name, names[menu_idx], sizeof(names[menu_idx]));
 
 		option->name = names[menu_idx];
-		option->beh = MB_OPT_CUSTOM;
+		option->beh = MB_NONE;
 		option->id = i;
 		option->enabled = 1;
 		option->selectable = 1;
@@ -184,7 +194,7 @@ static int menu_loop_core_page(int offset, int keys) {
 		menu_entry *option;
 		option = &e_menu_cores[menu_idx];
 		option->name = "Next page";
-		option->beh = MB_OPT_CUSTOM;
+		option->beh = MB_NONE;
 		option->id = i;
 		option->enabled = 1;
 		option->selectable = 1;
@@ -198,7 +208,7 @@ int menu_select_core(void) {
 	int ret = -1;
 	getcwd(cores_path, MAX_PATH);
 
-	corelist_len = scandir(cores_path, &corelist, core_selector, alphasort);
+	corelist_len = scandir(cores_path, &corelist, core_selector, core_sorter);
 	if (!corelist_len) return -1;
 
 	plat_video_menu_enter(1);
@@ -341,6 +351,76 @@ static int menu_loop_select_content(int id, int keys) {
 
 	return 1;
 }
+
+static char recent_path[MAX_PATH];
+static int mh_set_recent(int id, int keys) {
+	if (id < recents_len) {
+		struct recent* ent = &recents[id];
+		strcpy(core_path, ent->core_path);
+		strcpy(recent_path, ent->content_path);
+	}
+	return 1;
+}
+static int menu_loop_recents_page(int offset, int keys) {
+	static int sel = 0;
+	menu_entry e_menu_recents[MENU_ITEMS_PER_PAGE + 2] = {0}; /* +2 for Next, NULL */
+	size_t menu_idx = 0;
+	char names[MENU_ITEMS_PER_PAGE][MAX_PATH];
+	int i;
+
+	for (i = offset, menu_idx = 0; i < recents_len && menu_idx < MENU_ITEMS_PER_PAGE; i++) {
+		struct recent* ent = &recents[i];
+		menu_entry* option = &e_menu_recents[menu_idx];
+
+		char* tmp = strrchr(ent->content_path, '/');
+		strcpy(names[menu_idx], tmp+1);
+		
+		option->name = names[menu_idx];
+		option->beh = MB_NONE;
+		option->id = i;
+		option->enabled = 1;
+		option->selectable = 1;
+		option->handler = mh_set_recent;
+		menu_idx++;
+	}
+
+	if (i < corelist_len) {
+		menu_entry* option = &e_menu_recents[menu_idx];
+		option->name = "Next page";
+		option->beh = MB_NONE;
+		option->id = i;
+		option->enabled = 1;
+		option->selectable = 1;
+		option->handler = menu_loop_recents_page;
+	}
+
+	return me_loop(e_menu_recents, &sel);
+	
+	return -1;
+}
+
+int menu_select_recent() {
+	if (!recents_len) return -1;
+
+	int ret = -1;
+	plat_video_menu_enter(1);
+	
+	if (menu_loop_recents_page(0, 0) < 0)
+		goto finish;
+	
+
+	strcpy(content_path, recent_path);
+	ret = 0;
+	
+finish:
+    /* wait until menu, ok, back is released */
+	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK))
+		;
+	
+	plat_video_menu_leave();
+	return ret;
+}
+
 
 static int menu_loop_disc(int id, int keys)
 {

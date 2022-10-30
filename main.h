@@ -22,6 +22,7 @@ typedef enum {
 extern bool should_quit;
 extern unsigned current_audio_buffer_size;
 extern char core_name[MAX_PATH];
+extern char content_path[MAX_PATH];
 extern int config_override;
 
 #ifdef MMENU

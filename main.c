@@ -12,6 +12,7 @@
 #include "menu.h"
 #include "overrides.h"
 #include "plat.h"
+#include "recents.h"
 #include "util.h"
 
 #ifdef MMENU
@@ -24,7 +25,8 @@ char save_template_path[MAX_PATH];
 
 bool should_quit = false;
 unsigned current_audio_buffer_size;
-char core_name[MAX_PATH];
+char core_name[MAX_PATH] = {0};
+char content_path[MAX_PATH] = {0};
 int config_override = 0;
 static int last_screenshot = 0;
 
@@ -509,8 +511,6 @@ static void adjust_audio(void) {
 }
 
 int main(int argc, char **argv) {
-	char content_path[MAX_PATH];
-
 	if (argc > 1) {
 		if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
 			printf("Usage: picoarch [libretro_core [content]]\n");
@@ -525,11 +525,20 @@ int main(int argc, char **argv) {
 	if (menu_init()) {
 		quit(-1);
 	}
-
-	if (argc > 1 && argv[1]) {
-		strncpy(core_path, argv[1], sizeof(core_path) - 1);
-	} else {
-		if (menu_select_core())
+	
+	recents_load(); // used by recent menu and quicksaves
+	
+	if (core_path[0]=='\0') {
+		if (argc > 1 && argv[1]) {
+			strncpy(core_path, argv[1], sizeof(core_path) - 1);
+		} else {
+			if (menu_select_core())
+				quit(-1);
+		}
+	}
+	
+	if (has_suffix_i(core_path, "/recent_libretro.so")) {
+		if (menu_select_recent())
 			quit(-1);
 	}
 
@@ -539,11 +548,13 @@ int main(int argc, char **argv) {
 		quit(-1);
 	}
 
-	if (argc > 2 && argv[2]) {
-		strncpy(content_path, argv[2], sizeof(content_path) - 1);
-	} else {
-		if (menu_select_content(content_path, sizeof(content_path)))
-			quit(-1);
+	if (content_path[0]=='\0') {
+		if (argc > 2 && argv[2]) {
+			strncpy(content_path, argv[2], sizeof(content_path) - 1);
+		} else {
+			if (menu_select_content(content_path, sizeof(content_path)))
+				quit(-1);
+		}
 	}
 
 	content = content_init(content_path);
@@ -551,7 +562,9 @@ int main(int argc, char **argv) {
 		PA_ERROR("Couldn't allocate memory for content path\n");
 		quit(-1);
 	}
-
+	
+	recents_add(core_path, content_path);
+	
 	set_defaults();
 	load_config();
 	core_load();

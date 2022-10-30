@@ -8,6 +8,7 @@ int menu_init(void);
 void menu_loop(void);
 int menu_select_core(void);
 int menu_select_content(char *filename, size_t len);
+int menu_select_recent();
 void menu_begin(void);
 void menu_end(void);
 void menu_finish(void);
