@@ -105,10 +105,11 @@ print-%:
 all: $(BIN) cores
 
 libpicofe/.patched:
-	cd libpicofe && git apply -p1 < ../patches/libpicofe/0001-key-combos.patch && touch .patched
+	cd libpicofe && $(foreach patch, $(sort $(wildcard patches/libpicofe/*.patch)), git apply -p1 < ../$(patch) &&) touch .patched
 
-clean-libpicofe:
-	test ! -f libpicofe/.patched || (cd libpicofe && git apply -p1 -R < ../patches/libpicofe/0001-key-combos.patch && rm .patched)
+clean-libpicofe: # only reverses the first patch, can't figure out how to apply them in reverse
+	$(error "unable to reverse patches at this time, sorry")
+	# test ! -f libpicofe/.patched || (cd libpicofe && git apply -p1 -R < ../patches/libpicofe/0001-key-combos.patch && rm .patched)
 
 plat_trimui.o: plat_sdl.c
 plat_linux.o: plat_sdl.c
