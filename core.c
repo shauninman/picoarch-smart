@@ -155,7 +155,12 @@ int state_read(void) {
 		PA_ERROR("Error restoring save state\n", strerror(errno));
 		goto error;
 	}
-
+	
+	if (state_slot<=9) { // ignore quicksave slot
+		content_based_name(content, filename, MAX_PATH, save_dir, NULL, ".state");
+		file_put_int(filename, state_slot);
+	}
+	
 	ret = 0;
 error:
 	if (state)
@@ -201,7 +206,12 @@ int state_write(void) {
 	}
 
 	plat_dump_screen(filename);
-
+	
+	if (state_slot<=9) { // ignore quicksave slot
+		content_based_name(content, filename, MAX_PATH, save_dir, NULL, ".state");
+		file_put_int(filename, state_slot);
+	}
+	
 	ret = 0;
 error:
 	if (state)
@@ -633,6 +643,12 @@ int core_load_content(struct content *content) {
 #ifdef MMENU
 	content_based_name(content, save_template_path, MAX_PATH, save_dir, NULL, ".st%i");
 #endif
+	
+	char state_path[MAX_PATH];
+	content_based_name(content, state_path, MAX_PATH, save_dir, NULL, ".state");
+	if (file_exists(state_path)) {
+		state_slot = file_get_int(state_path);
+	}
 
 	ret = 0;
 finish:

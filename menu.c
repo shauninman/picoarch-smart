@@ -598,9 +598,9 @@ static int main_menu_handler(int id, int keys)
 	case MA_MAIN_RESUME_GAME:
 		return 1;
 	case MA_MAIN_SAVE_STATE:
-		return menu_loop_savestate(0);
+		return menu_loop_savestate(0,state_slot);
 	case MA_MAIN_LOAD_STATE:
-		return menu_loop_savestate(1);
+		return menu_loop_savestate(1,state_slot);
 	case MA_MAIN_RESET_GAME:
 		current_core.retro_reset();
 		return 1;
