@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "util.h"
 
 struct string_list *string_split(const char *string, char delim) {
@@ -79,4 +81,37 @@ void string_wrap(char *string, size_t max_len, size_t max_lines) {
 		}
 	}
 	string_truncate(line, max_len);
+}
+
+int string_match(const char* str1, const char* str2) {
+	int len1 = strlen(str1);
+	if (len1!=strlen(str2)) return 0;
+	return (strncmp(str1,str2,len1)==0);
+}
+
+void file_put_string(const char* path, const char* str) {
+	FILE* file = fopen(path, "w");
+	if (file) {
+		fputs(str, file);
+		fclose(file);
+	}
+}
+
+int file_get_int(const char* path) {
+	int i = 0;
+	FILE *file = fopen(path, "r");
+	if (file!=NULL) {
+		fscanf(file, "%i", &i);
+		fclose(file);
+	}
+	return i;
+}
+void file_put_int(const char* path, int value) {
+	char buffer[8];
+	sprintf(buffer, "%d", value);
+	file_put_string(path, buffer);
+}
+
+int file_exists(const char* path) {
+	return access(path, F_OK)==0;
 }

@@ -26,4 +26,11 @@ void string_list_free(struct string_list *list);
 void string_truncate(char *string, size_t max_len);
 void string_wrap(char *string, size_t max_len, size_t max_lines);
 
+int string_match(const char* str1, const char* str2);
+
+int file_exists(const char* path);
+void file_put_string(const char* path, const char* str);
+int file_get_int(const char* path);
+void file_put_int(const char* path, int value);
+
 #endif
