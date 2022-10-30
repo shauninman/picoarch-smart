@@ -14,7 +14,7 @@ CFLAGS     += -Wall
 CFLAGS     += -fdata-sections -ffunction-sections -DPICO_HOME_DIR='"/.picoarch/"' -flto
 CFLAGS     += -I./ -I./libretro-common/include/ $(shell $(SYSROOT)/usr/bin/sdl-config --cflags)
 
-LDFLAGS    = -lc -ldl -lgcc -lm -lSDL -lasound -lpng -lz -Wl,--gc-sections -flto
+LDFLAGS    = -lc -ldl -lgcc -lm -lSDL -lz -Wl,--gc-sections -flto
 
 # Unpolished or slow cores that build
 # EXTRA_CORES += fbalpha2012
@@ -53,10 +53,10 @@ smsplus-gx_CORE = smsplus_libretro.so
 snes9x2005_REPO = https://git.crowdedwood.com/snes9x2005
 snes9x2005_REVISION = performance
 
-ifeq ($(platform), trimui)
+ifeq ($(platform), trimui) # updated for Smart
 	OBJS += plat_trimui.o
-	CFLAGS += -mcpu=arm926ej-s -mtune=arm926ej-s -fno-PIC -DCONTENT_DIR='"/mnt/SDCARD/Roms"'
-	LDFLAGS += -fno-PIC
+	CFLAGS += -marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -march=armv7ve -fPIC -DCONTENT_DIR='"/mnt/SDCARD/Roms"'
+	LDFLAGS += -fPIC
 
 else ifeq ($(platform), unix)
 	OBJS += plat_linux.o
