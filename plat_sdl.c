@@ -8,7 +8,106 @@
 #include "scale.h"
 #include "util.h"
 
+// ------------------------------------------------------------
+// based on eggs Miyoo Mini GFX lib (any bad decisions are mine)
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+#include <pthread.h>
+#include <sys/time.h>
+
+#define FB_BUFFER_COUNT 3
+#define SCREEN_DEPTH SCREEN_BPP * 8
+
+static int		fb_idx = 0;
+static int		fd_fb = 0;
+static void	   *fb_addr;
+static uint32_t fb_size = 0;
+
+pthread_t		flip_pt;
+pthread_mutex_t	flip_mx;
+pthread_cond_t	flip_req;
+pthread_cond_t	flip_start;
+volatile uint32_t now_flipping;
+
+static SDL_Surface* video;
 static SDL_Surface* screen;
+static void* flip_thread(void* param) {
+	pthread_mutex_lock(&flip_mx);
+	while (1) {
+		while (!now_flipping) pthread_cond_wait(&flip_req, &flip_mx);
+		do {
+			pthread_cond_signal(&flip_start);
+			pthread_mutex_unlock(&flip_mx);
+			int arg = 0;
+			if (limit_frames) ioctl(fd_fb, FBIO_WAITFORVSYNC, &arg);
+			SDL_Flip(video); // this handles rotation
+			pthread_mutex_lock(&flip_mx);
+		} while (--now_flipping);
+	}
+	return NULL;
+}
+
+static void flip_init(void) {
+	fd_fb = open("/dev/fb0", O_RDWR);
+	video = SDL_SetVideoMode(SCREEN_WIDTH,SCREEN_HEIGHT,SCREEN_DEPTH,SDL_SWSURFACE);
+	
+	int	pitch = SCREEN_WIDTH * SCREEN_BPP;
+	fb_size = pitch * SCREEN_HEIGHT;
+	fb_addr = malloc(fb_size * FB_BUFFER_COUNT);
+	screen = SDL_CreateRGBSurfaceFrom(fb_addr,SCREEN_WIDTH,SCREEN_HEIGHT,SCREEN_DEPTH,pitch,0,0,0,0);
+	
+	flip_mx = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+	flip_req = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+	flip_start = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+	now_flipping = 0;
+	pthread_create(&flip_pt, NULL, flip_thread, NULL);
+}
+
+static void do_flip(void) {
+	// flipping heck
+	pthread_mutex_lock(&flip_mx);
+	while (now_flipping==2) pthread_cond_wait(&flip_start, &flip_mx);
+	
+	// flip
+	SDL_BlitSurface(screen, NULL, video, NULL); // because the screen is rotated this blits to a shadow buffer
+	
+	// advance screen buffer so we can draw the next frame while waiting for vsync
+	fb_idx += 1;
+	if (fb_idx>=FB_BUFFER_COUNT) fb_idx -= FB_BUFFER_COUNT;
+	screen->pixels = fb_addr + (fb_size * fb_idx);
+	
+	if (!now_flipping) {
+		now_flipping = 1;
+		pthread_cond_signal(&flip_req);
+		pthread_cond_wait(&flip_start, &flip_mx);
+	} else {
+		now_flipping = 2;
+	}
+	
+	pthread_mutex_unlock(&flip_mx);
+}
+
+static void flip_clear(void) {
+	memset(fb_addr, 0, fb_size * FB_BUFFER_COUNT);
+}
+
+static void flip_quit(void) {
+	SDL_FillRect(video, NULL, 0);
+	SDL_Flip(video);
+	
+	pthread_cancel(flip_pt);
+	pthread_join(flip_pt, NULL);
+	
+	close(fd_fb);
+	
+	SDL_FreeSurface(screen);
+	free(fb_addr);
+}
+
+// ------------------------------------------------------------
 
 struct audio_state {
 	unsigned buf_w;
@@ -89,7 +188,8 @@ static int audio_resample_nearest(struct audio_frame data) {
 
 static void *fb_flip(void)
 {
-	SDL_Flip(screen);
+	SDL_BlitSurface(screen, NULL, video, NULL);
+	do_flip();
 	return screen->pixels;
 }
 
@@ -189,13 +289,15 @@ void plat_video_menu_leave(void)
 {
 	memset(g_menubg_src_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
 
-	SDL_LockSurface(screen);
-	memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
-	SDL_UnlockSurface(screen);
-	fb_flip();
-	SDL_LockSurface(screen);
-	memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
-	SDL_UnlockSurface(screen);
+	flip_clear();
+	
+	// SDL_LockSurface(screen);
+	// memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	// SDL_UnlockSurface(screen);
+	// fb_flip();
+	// SDL_LockSurface(screen);
+	// memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	// SDL_UnlockSurface(screen);
 
 	g_menuscreen_ptr = NULL;
 }
@@ -216,11 +318,63 @@ void plat_video_set_msg(const char *new_msg, unsigned priority, unsigned msec)
 	}
 }
 
+uint64_t plat_get_ticks_us_u64(void) {
+    uint64_t ret;
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+
+    ret = (uint64_t)tv.tv_sec * 1000000;
+    ret += (uint64_t)tv.tv_usec;
+
+    return ret;
+}
+
+#define FRAME_LIMIT_US 12000 
 void plat_video_process(const void *data, unsigned width, unsigned height, size_t pitch) {
+	static uint64_t last_flip_time_us = 0;
+	static uint64_t next_frame_time_us = 0;
+	
+	uint64_t time = plat_get_ticks_us_u64();
+	int skip_flip = !limit_frames && time-last_flip_time_us<FRAME_LIMIT_US;
+	if (!enable_drc) {
+		if (!skip_flip) {
+			last_flip_time_us = time;
+		}
+		
+		next_frame_time_us = 0;
+		
+		if (skip_flip) return;
+		
+	} else {
+		if ( (!next_frame_time_us) || (!limit_frames) ) {
+			next_frame_time_us = time;
+		}
+		
+		if (!skip_flip) {
+			last_flip_time_us = time;
+		}
+
+		do {
+			next_frame_time_us += frame_time;
+		} while (next_frame_time_us < time);
+		
+		if (skip_flip) return;
+	}
+	
 	static int had_msg = 0;
 	frame_dirty = true;
 	SDL_LockSurface(screen);
-
+	
+	// clean up undrawn space
+	static unsigned last_width = 0;
+	static unsigned last_height = 0;
+	if (width!=last_width || height!=last_height) {
+		flip_clear();
+		last_width = width;
+		last_height = height;
+	}
+	
 	if (had_msg) {
 		video_clear_msg(screen->pixels, screen->h, screen->pitch / SCREEN_BPP);
 		had_msg = 0;
@@ -239,27 +393,33 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 }
 
 void plat_video_flip(void)
-{
-	static unsigned int next_frame_time_us = 0;
-
+{	
+	// commented out bits not needed because we're waiting for vsync in fb_flip()
+	
+	// static unsigned int next_frame_time_us = 0;
+	//
 	if (frame_dirty) {
-		unsigned int time = plat_get_ticks_us();
-
-		if (limit_frames && enable_drc && time < next_frame_time_us) {
-			usleep(next_frame_time_us - time);
-		}
-
-		if (!next_frame_time_us)
-			next_frame_time_us = time;
-
+	// 	unsigned int time = plat_get_ticks_us();
+	//
+	// 	if (limit_frames && enable_drc && time < next_frame_time_us) {
+	// 		usleep(next_frame_time_us - time);
+	// 	}
+	//
+	// 	if (!next_frame_time_us)
+	// 		next_frame_time_us = time;
+	//
 		fb_flip();
-
-		do {
-			next_frame_time_us += frame_time;
-		} while (next_frame_time_us < time);
+	//
+	// 	do {
+	// 		next_frame_time_us += frame_time;
+	// 	} while (next_frame_time_us < time);
 	}
 
 	frame_dirty = false;
+}
+
+void plat_video_clear(void) {
+	flip_clear();
 }
 
 void plat_video_close(void)
@@ -494,12 +654,9 @@ int plat_init(void)
 	putenv("SDL_USE_PAN=true");
 	
 	SDL_Init(SDL_INIT_VIDEO);
-	screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP * 8, SDL_SWSURFACE);
-	if (screen == NULL) {
-		PA_ERROR("%s, failed to set video mode\n", __func__);
-		return -1;
-	}
-
+	
+	flip_init();
+	
 	SDL_ShowCursor(0);
 
 	g_menuscreen_w = SCREEN_WIDTH;
@@ -548,7 +705,6 @@ int plat_reinit(void)
 void plat_finish(void)
 {
 	plat_sound_finish();
-	SDL_FreeSurface(screen);
-	screen = NULL;
+	flip_quit();
 	SDL_Quit();
 }

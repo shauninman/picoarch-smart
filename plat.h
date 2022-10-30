@@ -23,6 +23,7 @@ void plat_video_open(void);
 void plat_video_set_msg(const char *new_msg, unsigned priority, unsigned msec);
 void plat_video_process(const void *data, unsigned width, unsigned height, size_t pitch);
 void plat_video_flip(void);
+void plat_video_clear(void);
 void plat_video_close(void);
 
 unsigned plat_cpu_ticks(void);
