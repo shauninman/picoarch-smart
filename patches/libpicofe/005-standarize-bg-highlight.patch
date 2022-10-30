@@ -1,0 +1,115 @@
+diff --git a/menu.c b/menu.c
+index 685850537afd2c1ace97ae757fd5e5989eec4d02..c98160e265d178eb1d69c97dc9a630ae77a5c922 100644
+--- a/menu.c
++++ b/menu.c
+@@ -51,7 +51,7 @@ int g_autostateld_opt;
+ 
+ static unsigned char *menu_font_data = NULL;
+ static int menu_text_color = 0xfffe; // default to white
+-static int menu_sel_color = -1; // disabled
++static int menu_sel_color = 0xfffe; // disabled
+ 
+ /* note: these might become non-constant in future */
+ #if MENU_X2
+@@ -221,11 +221,11 @@ static void menu_draw_selection(int x, int y, int w)
+ 	int i, h;
+ 	unsigned short *dst, *dest;
+ 
+-	text_out16_(x, y, (void *)1, (menu_sel_color < 0) ? menu_text_color : menu_sel_color);
++	// text_out16_(x, y, (void *)1, (menu_sel_color < 0) ? menu_text_color : menu_sel_color);
+ 
+ 	if (menu_sel_color < 0) return; // no selection hilight
+ 
+-	if (y > 0) y--;
++	if (y > 0) y -= 2;
+ 	dest = (unsigned short *)g_menuscreen_ptr + x + y * g_menuscreen_pp + me_mfont_w * 2 - 2;
+ 	for (h = me_mfont_h + 1; h > 0; h--)
+ 	{
+@@ -599,7 +599,7 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
+ 	menu_draw_selection(x, y + vi_sel_ln * me_mfont_h, w);
+ 	x += me_mfont_w * 2;
+ 
+-	for (ent = entries; ent->name; ent++)
++	for (ent = entries, i = n = 0; ent->name; ent++, i++)
+ 	{
+ 		const char **names;
+ 		int len, leftname_end = 0;
+@@ -607,6 +607,9 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
+ 		if (!ent->enabled)
+ 			continue;
+ 
++		if (n==vi_sel_ln) menu_text_color = 0x0;
++		n++;
++		
+ 		name = ent->name;
+ 		if (strlen(name) == 0) {
+ 			if (ent->generate_name)
+@@ -654,6 +657,7 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
+ 		}
+ 
+ 		y += me_mfont_h;
++		menu_text_color = menu_sel_color;
+ 	}
+ 
+ 	menu_separation();
+@@ -895,7 +899,8 @@ static void draw_dirlist(char *curdir, struct dirent **namelist,
+ 
+ 	darken_ptr = (short *)g_menuscreen_ptr + g_menuscreen_pp * max_cnt/2 * me_sfont_h;
+ 	menu_darken_bg(darken_ptr, darken_ptr, g_menuscreen_pp * me_sfont_h * 8 / 10, 0);
+-
++	menu_draw_selection(0,max_cnt/2 * me_sfont_h,320);
++	
+ 	x = 5 + me_mfont_w + 1;
+ 	if (start - 2 >= 0)
+ 		smalltext_out16(14, (start - 2) * me_sfont_h, curdir, 0xffff);
+@@ -903,15 +908,16 @@ static void draw_dirlist(char *curdir, struct dirent **namelist,
+ 		pos = start + i;
+ 		if (pos < 0)  continue;
+ 		if (pos >= max_cnt) break;
++		int color = i==sel ? 0x0 : menu_text_color;
+ 		if (namelist[i]->d_type == DT_DIR) {
+-			smalltext_out16(x, pos * me_sfont_h, "/", 0xfff6);
+-			smalltext_out16(x + me_sfont_w, pos * me_sfont_h, namelist[i]->d_name, 0xfff6);
++			smalltext_out16(x, pos * me_sfont_h, "/", color);
++			smalltext_out16(x + me_sfont_w, pos * me_sfont_h, namelist[i]->d_name, color);
+ 		} else {
+-			unsigned short color = fname2color(namelist[i]->d_name);
++			// unsigned short color = fname2color(namelist[i]->d_name);
+ 			smalltext_out16(x, pos * me_sfont_h, namelist[i]->d_name, color);
+ 		}
+ 	}
+-	smalltext_out16(5, max_cnt/2 * me_sfont_h, ">", 0xffff);
++	// smalltext_out16(5, max_cnt/2 * me_sfont_h, ">", 0xffff);
+ 
+ 	if (show_help) {
+ 		darken_ptr = (short *)g_menuscreen_ptr
+@@ -1265,10 +1271,13 @@ static void draw_savestate_menu(int menu_sel, int is_loading)
+ 				strftime(time_buf, sizeof(time_buf), "%x %R", t);
+ 			}
+ 		}
+-
++		if (i==menu_sel) menu_text_color = 0x0;
+ 		text_out16(x, y, "SLOT %i (%s)", i, time_buf);
++		menu_text_color = menu_sel_color;
+ 	}
++	if (menu_sel==STATE_SLOT_COUNT) menu_text_color = 0x0;
+ 	text_out16(x, y, "back");
++	menu_text_color = menu_sel_color;
+ 
+ 	menu_draw_end();
+ }
+@@ -1418,9 +1427,11 @@ static void draw_key_config(const me_bind_action *opts, int opt_cnt, int player_
+ 	y += 2 * me_mfont_h;
+ 	menu_draw_selection(x - me_mfont_w * 2, y + sel * me_mfont_h, w + 2 * me_mfont_w);
+ 
+-	for (i = 0; i < opt_cnt; i++, y += me_mfont_h)
+-		text_out16(x, y, "%s : %s", opts[i].name,
+-			action_binds(player_idx, opts[i].mask, dev_id));
++	for (i = 0; i < opt_cnt; i++, y += me_mfont_h) {
++		if (i==sel) menu_text_color = 0x0;
++		text_out16(x, y, "%s : %s", opts[i].name, action_binds(player_idx, opts[i].mask, dev_id));
++		menu_text_color = menu_sel_color;
++	}
+ 
+ 	menu_separation();
+ 
