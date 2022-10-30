@@ -1,0 +1,56 @@
+#!/bin/sh
+
+cd $(dirname "$0")
+
+# kill led ----------------------------------------------------
+echo 0 > /sys/devices/platform/sunxi-led/leds/led1/brightness
+echo 0 > /sys/devices/platform/sunxi-led/leds/led2/brightness
+echo 0 > /sys/devices/platform/sunxi-led/leds/led3/brightness
+
+# recover from readonly SD card -------------------------------
+touch /mnt/writetest
+sync
+if [ -f /mnt/writetest ] ; then
+	rm -f /mnt/writetest
+else
+	e2fsck -p /dev/root > /mnt/SDCARD/RootRecovery.txt
+	reboot
+fi
+
+# launch keymon -----------------------------------------------
+export LD_LIBRARY_PATH=/usr/trimui/lib
+keymon &
+
+# restore brightness ------------------------------------------
+MIN_BRIGHT=30 # 10 is actual min
+MAX_BRIGHT=255
+BRIGHT=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.brightness")
+BRIGHT=$(( $BRIGHT * ($MAX_BRIGHT-$MIN_BRIGHT) / 10 + $MIN_BRIGHT ))
+/usr/trimui/bin/iodisp 0 $BRIGHT
+
+# restore volume ----------------------------------------------
+VOL=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.vol")
+# VOL=$(( $VOL * 31 / 20 ))
+# a bug in keymon maxes vol at 10 instead of the 20
+if [ $VOL -gt 10 ]; then
+	VOL=10
+fi
+VOL=$(( $VOL * 31 / 10 ))
+amixer sset 'Lineout volume' $VOL
+
+# launch picoarch ---------------------------------------------
+export HOME=/mnt/SDCARD/Roms
+mkdir -p "$HOME/.picoarch"
+
+if [ !-f recent_libretro.so]; then
+	touch recent_libretro.so # a dummy file to enable recent list
+fi
+
+while :; do
+	if [ -f picoarch.txt ]; then
+		mv picoarch.txt picoarch-previous.txt
+	fi
+		
+	./picoarch &> ./picoarch.txt
+	sync
+done
