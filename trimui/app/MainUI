@@ -38,17 +38,27 @@ fi
 VOL=$(( $VOL * 31 / 10 ))
 amixer sset 'Lineout volume' $VOL
 
-# launch picoarch ---------------------------------------------
 export HOME=/mnt/SDCARD/Roms
 mkdir -p "$HOME/.picoarch"
 
-if [ !-f recent_libretro.so]; then
-	touch recent_libretro.so # a dummy file to enable recent list
+# prepare dummy recent core -----------------------------------
+if [ !-f ./recent_libretro.so]; then
+	touch ./recent_libretro.so
 fi
 
+# copy over bios if necessary ---------------------------------
+# TODO: can cause hang if you launch a core while still copying
+# if [ ! -f ./system/gb_bios.bin ]; then
+# 	cp -rf /mnt/SDCARD/RetroArch/.retroarch/system ./ &
+# fi
+
+echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+echo A,B,X,Y,L,R > /sys/module/gpio_keys_polled/parameters/button_config
+
+# launch picoarch ---------------------------------------------
 while :; do
-	if [ -f picoarch.txt ]; then
-		mv picoarch.txt picoarch-previous.txt
+	if [ -f ./picoarch.txt ]; then
+		mv ./picoarch.txt ./picoarch-previous.txt
 	fi
 		
 	./picoarch &> ./picoarch.txt
