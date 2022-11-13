@@ -9,6 +9,54 @@
 #include "util.h"
 
 // ------------------------------------------------------------
+#include <dlfcn.h>
+
+typedef struct _KeyShmInfo{
+    int id;
+    void *addr;
+}KeyShmInfo;
+
+#define MONITOR_VOLUME 0
+#define MONITOR_BRIGHTNESS 1
+#define MONITOR_ADC_VALUE 8
+
+typedef int (*InitKeyShm_t)(KeyShmInfo *);
+typedef int (*SetKeyShm_t)(KeyShmInfo* info, int key, int value);
+typedef int (*GetKeyShm_t)(KeyShmInfo* info, int key);
+typedef int (*UninitKeyShm_t)(KeyShmInfo *);
+
+static void* libshmvar;
+static GetKeyShm_t GetKeyShm;
+
+static KeyShmInfo info;
+static void monitor_init(void) {
+	libshmvar	 = dlopen("libshmvar.so", RTLD_LAZY);
+	GetKeyShm	 = dlsym(libshmvar, "GetKeyShm"); 
+
+	InitKeyShm_t InitKeyShm	 = dlsym(libshmvar, "InitKeyShm");
+	InitKeyShm(&info);
+}
+static void monitor_quit(void) {
+	UninitKeyShm_t UninitKeyShm = dlsym(libshmvar, "UninitKeyShm");
+	UninitKeyShm(&info);
+	// dlcose(libshmvar); // not available?
+}
+static int monitor_charge(void) {
+	int adc = GetKeyShm(&info, MONITOR_ADC_VALUE);
+	if (adc>43) return 5;
+	if (adc>42) return 4;
+	if (adc>41) return 3;
+	if (adc>39) return 2;
+	return 1;
+}
+static int monitor_volume(void) {
+	return GetKeyShm(&info, MONITOR_VOLUME);
+}
+static int monitor_brightness(void) {
+	return GetKeyShm(&info, MONITOR_BRIGHTNESS);
+}
+
+// ------------------------------------------------------------
 // based on eggs Miyoo Mini GFX lib (any bad decisions are mine)
 
 #include <fcntl.h>
@@ -34,6 +82,7 @@ volatile uint32_t now_flipping;
 
 static SDL_Surface* video;
 static SDL_Surface* screen;
+static SDL_Surface* menu;
 static void* flip_thread(void* param) {
 	pthread_mutex_lock(&flip_mx);
 	while (1) {
@@ -188,6 +237,7 @@ static int audio_resample_nearest(struct audio_frame data) {
 
 static void *fb_flip(void)
 {
+	plat_draw_hud();
 	SDL_BlitSurface(screen, NULL, video, NULL);
 	do_flip();
 	return screen->pixels;
@@ -667,6 +717,8 @@ int plat_init(void)
 	g_menubg_src_w = SCREEN_WIDTH;
 	g_menubg_src_h = SCREEN_HEIGHT;
 	g_menubg_src_pp = SCREEN_WIDTH;
+	
+	menu = SDL_CreateRGBSurfaceFrom(g_menuscreen_ptr,g_menuscreen_w,g_menuscreen_h,16,g_menuscreen_w * sizeof(uint16_t),0,0,0,0);
 
 	if (in_sdl_init(&in_sdl_platform_data, plat_sdl_event_handler)) {
 		PA_ERROR("SDL input failed to init: %s\n", SDL_GetError());
@@ -678,6 +730,8 @@ int plat_init(void)
 		PA_ERROR("SDL sound failed to init: %s\n", SDL_GetError());
 		return -1;
 	}
+	
+	monitor_init();
 	return 0;
 }
 
@@ -704,7 +758,57 @@ int plat_reinit(void)
 
 void plat_finish(void)
 {
+	monitor_quit();
 	plat_sound_finish();
 	flip_quit();
 	SDL_Quit();
+}
+
+void plat_draw_hud(void) {
+	SDL_Surface* buffer = screen;
+	if (g_menuscreen_ptr) {
+		menu->pixels = g_menuscreen_ptr;
+		buffer = menu;
+	}
+	
+	uint32_t white = SDL_MapRGB(buffer->format,0xff,0xff,0xff);
+	uint32_t red = SDL_MapRGB(buffer->format,0xff,0,0);
+	
+	// TODO: this is super gross
+	Uint8 *keystate = SDL_GetKeyState(NULL);
+	if (keystate[SDLK_RCTRL]) {
+		int v = monitor_volume();
+		int x = 130;
+		int y = 8;
+		int h = 6;
+		for (int i=0; i<v; i++) {
+			SDL_FillRect(buffer, &(SDL_Rect){x+(i*3),y,2,h}, white);
+		}
+	}
+	else if (keystate[SDLK_RETURN]) {
+		int b = monitor_brightness();
+		int x = 130;
+		int y = 8;
+		int h = 6;
+		for (int i=0; i<b; i++) {
+			SDL_FillRect(buffer, &(SDL_Rect){x+(i*6),y,5,h}, white);
+		}
+	}
+	
+	int charge = monitor_charge();
+	if (g_menuscreen_ptr || charge==1) {
+		int w = 14;
+		int h = 6;
+		uint32_t c = charge == 1 ? red : white;
+
+		int x = SCREEN_WIDTH-4-(w+8);
+		int y = 4;
+
+		SDL_FillRect(buffer, &(SDL_Rect){x,y,w+8,h+8}, 0);
+		SDL_FillRect(buffer, &(SDL_Rect){x+2,y+2,w+4,h+4}, c);
+		SDL_FillRect(buffer, &(SDL_Rect){x+3,y+3,w+2,h+2}, 0);
+		for (int i=0; i<charge; i++) {
+			SDL_FillRect(buffer, &(SDL_Rect){x+4+(i*3),y+4,2,h}, c);
+		}
+	}
 }

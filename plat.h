@@ -32,4 +32,6 @@ int plat_sound_occupancy(void);
 extern void (*plat_sound_write)(const struct audio_frame *data, int frames);
 void plat_sound_resize_buffer(void);
 
+void plat_draw_hud(void);
+
 #endif /* __PLAT_H__ */
