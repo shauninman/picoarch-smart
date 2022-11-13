@@ -55,7 +55,7 @@ snes9x2005_REVISION = performance
 
 ifeq ($(platform), trimui) # updated for Smart
 	OBJS += plat_trimui.o
-	CFLAGS += -marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -march=armv7ve -fPIC -DCONTENT_DIR='"/mnt/SDCARD/Roms"'
+	CFLAGS += -marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -mcpu=cortex-a7 -fPIC -DCONTENT_DIR='"/mnt/SDCARD/Roms"'
 	LDFLAGS += -fPIC
 
 else ifeq ($(platform), unix)
