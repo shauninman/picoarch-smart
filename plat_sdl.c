@@ -42,11 +42,37 @@ static void monitor_quit(void) {
 	// dlcose(libshmvar); // not available?
 }
 static int monitor_charge(void) {
-	int adc = GetKeyShm(&info, MONITOR_ADC_VALUE);
-	if (adc>43) return 5;
-	if (adc>42) return 4;
-	if (adc>41) return 3;
-	if (adc>39) return 2;
+	FILE *in;
+	int max = 12; // past minute?
+	int count = 0;
+	long int pos;
+	char s[100];
+
+	in = fopen("/mnt/SDCARD/adc_value_dump", "r");
+	fseek(in, 0, SEEK_END);
+	pos = ftell(in);
+	while (pos) {
+	   fseek(in, --pos, SEEK_SET); /* seek from begin */
+	   if (fgetc(in) == '\n') {
+	       if (count++ == max) break;
+	   }
+	}
+
+	char *tmp;
+	int sum = 0;
+	int x = 0;
+	while (fgets(s, sizeof(s), in) != NULL) {
+		tmp = strrchr(s, ' ')+1;
+		sum += atoi(tmp);
+		x += 1;
+	}
+	int avg = ((float)sum / (float)x) + 0.5;
+	fclose(in);
+
+	if (avg>43) return 5;
+	if (avg>42) return 4;
+	if (avg>41) return 3;
+	if (avg>39) return 2;
 	return 1;
 }
 static int monitor_volume(void) {
@@ -380,6 +406,7 @@ uint64_t plat_get_ticks_us_u64(void) {
     return ret;
 }
 
+static int hud_dirty = 0;
 #define FRAME_LIMIT_US 12000 
 void plat_video_process(const void *data, unsigned width, unsigned height, size_t pitch) {
 	static uint64_t last_flip_time_us = 0;
@@ -419,10 +446,11 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	// clean up undrawn space
 	static unsigned last_width = 0;
 	static unsigned last_height = 0;
-	if (width!=last_width || height!=last_height) {
+	if (width!=last_width || height!=last_height || hud_dirty>0) {
 		flip_clear();
 		last_width = width;
 		last_height = height;
+		hud_dirty -= 1; // TODO: so gross!
 	}
 	
 	if (had_msg) {
@@ -764,6 +792,10 @@ void plat_finish(void)
 	SDL_Quit();
 }
 
+int is_select = 0;
+int was_select = 0;
+int is_start = 0;
+int was_start = 0;
 void plat_draw_hud(void) {
 	SDL_Surface* buffer = screen;
 	if (g_menuscreen_ptr) {
@@ -773,26 +805,38 @@ void plat_draw_hud(void) {
 	
 	uint32_t white = SDL_MapRGB(buffer->format,0xff,0xff,0xff);
 	uint32_t red = SDL_MapRGB(buffer->format,0xff,0,0);
+
+	was_select = is_select;
+	was_start = is_start;
+	is_select = 0;
+	is_start = 0;
 	
 	// TODO: this is super gross
 	Uint8 *keystate = SDL_GetKeyState(NULL);
 	if (keystate[SDLK_RCTRL]) {
+		is_select = 1;
 		int v = monitor_volume();
 		int x = 130;
 		int y = 8;
 		int h = 6;
+		SDL_FillRect(buffer, &(SDL_Rect){x,y,60,h}, 0);
 		for (int i=0; i<v; i++) {
 			SDL_FillRect(buffer, &(SDL_Rect){x+(i*3),y,2,h}, white);
 		}
 	}
 	else if (keystate[SDLK_RETURN]) {
+		is_start = 1;
 		int b = monitor_brightness();
 		int x = 130;
 		int y = 8;
 		int h = 6;
+		SDL_FillRect(buffer, &(SDL_Rect){x,y,60,h}, 0);
 		for (int i=0; i<b; i++) {
 			SDL_FillRect(buffer, &(SDL_Rect){x+(i*6),y,5,h}, white);
 		}
+	}
+	if ((was_select && !is_select) || (was_start && !is_start)) {
+		hud_dirty = FB_BUFFER_COUNT; // TODO: so so gross!
 	}
 	
 	int charge = monitor_charge();
