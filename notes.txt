@@ -3,15 +3,7 @@ todo
 		turn back on on any button press (and eat that input)
 
 known issues
-	volume and brightness indicators
-		don't clear in menus until next input
-		don't appear in states and controls menus (possibly others)
-		don't clear in borders around emulated screen
-			workaround: open/close menu
+	supafaust core doesn't work
 		
 changes
-	added volume and brightness indictors when changing with button combos
-	added battery indicator
-	fixed internally swapped A and Y buttons
-	enable performance mode by default
 	
