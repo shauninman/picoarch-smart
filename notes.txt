@@ -1,9 +1,11 @@
 todo
+	resume with x
 	turn off the screen after 30 seconds when in menu
 		turn back on on any button press (and eat that input)
 
 known issues
 	supafaust core doesn't work
-		
-changes
 	
+changes
+	press X to resume the selected game from your most recently used save state
+	press MENU on initial menu to open Commander (must have Commander installed in /Apps)

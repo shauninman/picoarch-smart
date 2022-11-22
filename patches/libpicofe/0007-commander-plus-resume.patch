@@ -1,0 +1,105 @@
+diff --git a/menu.c b/menu.c
+index a15c3c19f8f63d1ac4f5d9f0f736abf5ae69c2a7..7b1c4179be397b017fcde6a326d4f2733a26b2c7 100644
+--- a/menu.c
++++ b/menu.c
+@@ -751,9 +751,16 @@ static int me_loop_d(menu_entry *menu, int *menu_sel, void (*draw_prep)(void), v
+ 
+ 		me_draw(menu, sel, draw_more);
+ 		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
+-			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R, NULL, 70);
+-		if (inp & (PBTN_MENU|PBTN_MBACK))
++			PBTN_MOK|PBTN_MA3|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R, NULL, 70);
++		if (inp & (PBTN_MENU|PBTN_MBACK)) {
++			
++			// :grimacing:
++			if (!current_core.handle && (inp & PBTN_MENU)) {
++				system("touch /tmp/commander"); 
++			}
++			
+ 			break;
++		}
+ 
+ 		if (inp & PBTN_UP  ) {
+ 			do {
+@@ -782,12 +789,20 @@ static int me_loop_d(menu_entry *menu, int *menu_sel, void (*draw_prep)(void), v
+ 				continue;
+ 		}
+ 
+-		if (inp & (PBTN_MOK|PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R))
++		if (inp & (PBTN_MOK|PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R|PBTN_MA3))
+ 		{
+ 			/* require PBTN_MOK for MB_NONE */
+-			if (menu[sel].handler != NULL && (menu[sel].beh != MB_NONE || (inp & PBTN_MOK))) {
++			if (menu[sel].handler != NULL && (menu[sel].beh != MB_NONE || (inp & (PBTN_MOK)) || (picking_recent && (inp & PBTN_MA3)))) {
+ 				ret = menu[sel].handler(menu[sel].id, inp);
+-				if (ret) break;
++				if (ret) {
++					
++					// :grimacing:
++					if ((inp & PBTN_MA3)) {
++						should_resume = 1;
++						picking_recent = 0;
++					}
++					break;
++				}
+ 				menu_sel_max = me_count(menu) - 1; /* might change, so update */
+ 			}
+ 		}
+@@ -849,6 +864,8 @@ static void draw_menu_message(const char *msg, void (*draw_more)(void))
+ 
+ static void do_delete(const char *fpath, const char *fname)
+ {
++	return;
++	
+ 	int len, mid, inp;
+ 	const char *nm;
+ 	char tmp[64];
+@@ -919,7 +936,7 @@ static void draw_dirlist(char *curdir, struct dirent **namelist,
+ 	}
+ 	// smalltext_out16(5, max_cnt/2 * me_sfont_h, ">", 0xffff);
+ 
+-	if (show_help) {
++	if (show_help) { // will never be true
+ 		darken_ptr = (short *)g_menuscreen_ptr
+ 			+ g_menuscreen_pp * (g_menuscreen_h - me_sfont_h * 5 / 2);
+ 		menu_darken_bg(darken_ptr, darken_ptr,
+@@ -1124,12 +1141,12 @@ rescan:
+ 		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT
+ 			| PBTN_L|PBTN_R|PBTN_MA2|PBTN_MA3|PBTN_MOK|PBTN_MBACK
+ 			| PBTN_MENU|PBTN_CHAR, &cinp, 33);
+-		if (inp & PBTN_MA3)   {
+-			g_menu_filter_off = !g_menu_filter_off;
+-			snprintf(sel_fname, sizeof(sel_fname), "%s",
+-				namelist[sel]->d_name);
+-			goto rescan;
+-		}
++		// if (inp & PBTN_MA3)   {
++		// 	g_menu_filter_off = !g_menu_filter_off;
++		// 	snprintf(sel_fname, sizeof(sel_fname), "%s",
++		// 		namelist[sel]->d_name);
++		// 	goto rescan;
++		// }
+ 		if (inp & PBTN_UP  )  { sel--;   if (sel < 0)   sel = n-1; }
+ 		if (inp & PBTN_DOWN)  { sel++;   if (sel > n-1) sel = 0; }
+ 		if (inp & PBTN_LEFT)  { sel-=10; if (sel < 0)   sel = 0; }
+@@ -1137,7 +1154,7 @@ rescan:
+ 		if (inp & PBTN_RIGHT) { sel+=10; if (sel > n-1) sel = n-1; }
+ 		if (inp & PBTN_R)     { sel+=24; if (sel > n-1) sel = n-1; }
+ 
+-		if ((inp & PBTN_MOK) || (inp & (PBTN_MENU|PBTN_MA2)) == (PBTN_MENU|PBTN_MA2))
++		if ((inp & PBTN_MOK) || (inp & PBTN_MA3) || (inp & (PBTN_MENU|PBTN_MA2)) == (PBTN_MENU|PBTN_MA2))
+ 		{
+ 			if (namelist[sel]->d_type == DT_REG)
+ 			{
+@@ -1149,6 +1166,11 @@ rescan:
+ 					ret = rom_fname_reload;
+ 					break;
+ 				}
++				else if (inp & PBTN_MA3) {
++					should_resume = 1;
++					ret = rom_fname_reload;
++					break;
++				}
+ 				do_delete(rom_fname_reload, namelist[sel]->d_name);
+ 				goto rescan;
+ 			}

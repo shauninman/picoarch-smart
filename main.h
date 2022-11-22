@@ -24,6 +24,8 @@ extern unsigned current_audio_buffer_size;
 extern char core_name[MAX_PATH];
 extern char content_path[MAX_PATH];
 extern int config_override;
+extern int should_resume;
+extern int picking_recent;
 
 #ifdef MMENU
 extern void* mmenu;

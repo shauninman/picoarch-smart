@@ -394,7 +394,8 @@ static int menu_loop_recents_page(int offset, int keys) {
 		option->selectable = 1;
 		option->handler = menu_loop_recents_page;
 	}
-
+	
+	picking_recent = 1;
 	return me_loop(e_menu_recents, &sel);
 	
 	return -1;
@@ -414,8 +415,8 @@ int menu_select_recent() {
 	ret = 0;
 	
 finish:
-    /* wait until menu, ok, back is released */
-	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK))
+    /* wait until menu, ok, back, resume is released */
+	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK|PBTN_MA3))
 		;
 	
 	plat_video_menu_leave();
@@ -727,7 +728,7 @@ static menu_entry e_menu_main[] =
 	mee_handler_id("Cheats",             MA_MAIN_CHEATS,      menu_loop_cheats),
 	mee_handler   ("Options",            menu_loop_options),
 	mee_handler_id("Reset game",         MA_MAIN_RESET_GAME,  main_menu_handler),
-	mee_handler_id("Load new game",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
+	// mee_handler_id("Load new game",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
 	mee_handler_id("Quicksave",          MA_MAIN_QUICKSAVE,   main_menu_handler),
 	mee_handler_id("Exit",               MA_MAIN_EXIT,        main_menu_handler),
 	mee_end,

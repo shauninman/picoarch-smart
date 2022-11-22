@@ -28,6 +28,8 @@ unsigned current_audio_buffer_size;
 char core_name[MAX_PATH] = {0};
 char content_path[MAX_PATH] = {0};
 int config_override = 0;
+int should_resume = 0;
+int picking_recent = 0;
 static int last_screenshot = 0;
 
 static uint32_t vsyncs;
@@ -587,9 +589,11 @@ int main(int argc, char **argv) {
 	show_startup_message();
 	
 	int last_slot = state_slot;
-	if (quicksave_loaded) resume_slot = 99;
+	if (should_resume) resume_slot = last_slot;
+	else if (quicksave_loaded) resume_slot = 99;
 	state_resume();
 	if (quicksave_loaded) state_slot = last_slot;
+	should_resume = 0;
 
 	do {
 		count_fps();

@@ -63,4 +63,12 @@ while :; do
 		
 	./picoarch &> ./picoarch.txt
 	sync
+	
+	if [ -f /tmp/commander ]; then
+		rm /tmp/commander
+		if [ -f /mnt/SDCARD/Apps/Commander/launch.sh ]; then
+			/mnt/SDCARD/Apps/Commander/launch.sh
+		fi
+		sync
+	fi
 done
