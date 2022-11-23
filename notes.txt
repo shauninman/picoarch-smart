@@ -1,11 +1,11 @@
 todo
-	resume with x
-	turn off the screen after 30 seconds when in menu
-		turn back on on any button press (and eat that input)
+- enter faux sleep on MENU?
+
+changes
+- added faux sleep (after 30 seconds in menu without input screen off, volume muted, any button wakes)
 
 known issues
-	supafaust core doesn't work
+- battery hud is only capable of reporting 5 steps and they don't deplete at a consistent rate
+- when autoresuming a quicksave it takes about 30 seconds for performance to level out
+- mednafen_supafaust does not work for some reason
 	
-changes
-	press X to resume the selected game from your most recently used save state
-	press MENU on initial menu to open Commander (must have Commander installed in /Apps)

@@ -1,0 +1,105 @@
+diff --git a/menu.c b/menu.c
+index 7b1c4179be397b017fcde6a326d4f2733a26b2c7..395f95fc3c758fff2e26bb4382afb5295b70d87a 100644
+--- a/menu.c
++++ b/menu.c
+@@ -742,7 +742,7 @@ static int me_loop_d(menu_entry *menu, int *menu_sel, void (*draw_prep)(void), v
+ 
+ 	/* make sure action buttons are not pressed on entering menu */
+ 	me_draw(menu, sel, NULL);
+-	while (in_menu_wait_any(NULL, 50) & (PBTN_MOK|PBTN_MBACK|PBTN_MENU));
++	while (in_menu_wait_any(NULL, 50) & (PBTN_MOK|PBTN_MA3|PBTN_MBACK|PBTN_MENU));
+ 
+ 	for (;;)
+ 	{
+@@ -1132,7 +1132,7 @@ rescan:
+ 
+ 	/* make sure action buttons are not pressed on entering menu */
+ 	draw_dirlist(curr_path, namelist, n, sel, show_help);
+-	while (in_menu_wait_any(NULL, 50) & (PBTN_MOK|PBTN_MBACK|PBTN_MENU))
++	while (in_menu_wait_any(NULL, 50) & (PBTN_MOK|PBTN_MA3|PBTN_MBACK|PBTN_MENU))
+ 		;
+ 
+ 	for (;;)
+diff --git a/plat.h b/plat.h
+index 03949d6deb9f7af73802e4e26c8e883cf4495112..46c333c5ecea558a4301de1e6cc113c6744ada82 100644
+--- a/plat.h
++++ b/plat.h
+@@ -99,8 +99,12 @@ void plat_video_menu_end(void);
+ void plat_video_menu_leave(void);
+ 
+ void plat_video_flip(void);
++void plat_video_clear(void);
+ void plat_video_wait_vsync(void);
+ 
++void plat_faux_sleep(void);
++void plat_faux_wake(void);
++
+ /* return the dir/ where configs, saves, bios, etc. are found */
+ int  plat_get_root_dir(char *dst, int len);
+ 
+diff --git a/input.c b/input.c
+index aa1f155842e21ad1f5c1303eecaf03331599c406..02a7fe0fbd399368fa3f3953f4166581fe16bb27 100644
+--- a/input.c
++++ b/input.c
+@@ -313,11 +313,15 @@ int in_update_analog(int dev_id, int axis_id, int *result)
+ 
+ static int in_update_kc_async(int *dev_id_out, int *is_down_out, int timeout_ms)
+ {
+-	int i, is_down, result;
+-	unsigned int ticks;
++	int i, is_down, result = -1;
++	unsigned int ticks,now;
++	static unsigned int last_press = 0;
++	static int sleeping = 0;
++	unsigned int sleep_duration = 30000; // 30 seconds
+ 
+ 	ticks = plat_get_ticks_ms();
+-
++	if (!last_press) last_press = ticks;
++	
+ 	while (1)
+ 	{
+ 		for (i = 0; i < in_dev_count; i++) {
+@@ -333,16 +337,29 @@ static int in_update_kc_async(int *dev_id_out, int *is_down_out, int timeout_ms)
+ 				*dev_id_out = i;
+ 			if (is_down_out)
+ 				*is_down_out = is_down;
+-			return result;
++			goto finish;
+ 		}
+ 
+-		if (timeout_ms >= 0 && (int)(plat_get_ticks_ms() - ticks) > timeout_ms)
++		now = plat_get_ticks_ms();
++		if (!sleeping && now-last_press>=sleep_duration) {
++			sleeping = 1;
++			plat_faux_sleep();
++		}
++		
++		if (!sleeping && timeout_ms >= 0 && (int)(now - ticks) > timeout_ms)
+ 			break;
+ 
+ 		plat_sleep_ms(10);
+ 	}
+-
+-	return -1;
++	
++finish:
++	if (result>-1) last_press = plat_get_ticks_ms();
++	if (sleeping && result>0) { // TODO: only wake on MENU?
++		result = 0;
++		sleeping = 0;
++		plat_faux_wake();
++	}
++	return result;
+ }
+ 
+ /* 
+@@ -438,7 +455,7 @@ int in_menu_wait_any(char *charcode, int timeout_ms)
+ 	int dev_id = 0;
+ 
+ 	menu_key_prev = menu_key_state;
+-
++	
+ 	in_update_keycode(&dev_id, NULL, charcode, timeout_ms);
+ 
+ 	if (keys_old != menu_key_state)

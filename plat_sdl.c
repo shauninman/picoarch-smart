@@ -496,8 +496,28 @@ void plat_video_flip(void)
 	frame_dirty = false;
 }
 
-void plat_video_clear(void) {
+void plat_video_clear(void)
+{
 	flip_clear();
+	
+}
+
+static SDL_Surface* sleeper;
+void plat_faux_sleep(void) {
+	sleeper = SDL_DisplayFormat(video);
+	SDL_FillRect(video, NULL, 0);
+	SDL_Flip(video);
+	system("iodisp 0 0"); // turn off screen
+	system("amixer sset 'Lineout volume' 0"); // mute volume
+	system("leds_on"); // don't want to forget it's on
+}
+void plat_faux_wake(void) {
+	SDL_BlitSurface(sleeper,NULL,video,NULL);
+	SDL_FreeSurface(sleeper);
+	SDL_Flip(video);
+	system("restore_brightness");
+	system("restore_volume");
+	system("leds_off");
 }
 
 void plat_video_close(void)

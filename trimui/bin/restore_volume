@@ -1,0 +1,10 @@
+#!/bin/sh
+
+VOL=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.vol")
+# VOL=$(( $VOL * 31 / 20 ))
+# a bug in keymon maxes vol at 10 instead of the 20
+if [ $VOL -gt 10 ]; then
+	VOL=10
+fi
+VOL=$(( $VOL * 31 / 10 ))
+amixer sset 'Lineout volume' $VOL

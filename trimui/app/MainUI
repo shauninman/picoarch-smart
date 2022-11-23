@@ -3,9 +3,8 @@
 cd $(dirname "$0")
 
 # kill led ----------------------------------------------------
-echo 0 > /sys/devices/platform/sunxi-led/leds/led1/brightness
-echo 0 > /sys/devices/platform/sunxi-led/leds/led2/brightness
-echo 0 > /sys/devices/platform/sunxi-led/leds/led3/brightness
+export PATH=/mnt/SDCARD/trimui/bin:$PATH
+leds_off
 
 # recover from readonly SD card -------------------------------
 touch /mnt/writetest
@@ -21,23 +20,11 @@ fi
 export LD_LIBRARY_PATH=/usr/trimui/lib
 keymon &
 
-# restore brightness ------------------------------------------
-MIN_BRIGHT=30 # 10 is actual min
-MAX_BRIGHT=255
-BRIGHT=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.brightness")
-BRIGHT=$(( $BRIGHT * ($MAX_BRIGHT-$MIN_BRIGHT) / 10 + $MIN_BRIGHT ))
-/usr/trimui/bin/iodisp 0 $BRIGHT
+# restore settings --------------------------------------------
+restore_brightness
+restore_volume
 
-# restore volume ----------------------------------------------
-VOL=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.vol")
-# VOL=$(( $VOL * 31 / 20 ))
-# a bug in keymon maxes vol at 10 instead of the 20
-if [ $VOL -gt 10 ]; then
-	VOL=10
-fi
-VOL=$(( $VOL * 31 / 10 ))
-amixer sset 'Lineout volume' $VOL
-
+# prepare picoarch --------------------------------------------
 export HOME=/mnt/SDCARD/Roms
 mkdir -p "$HOME/.picoarch"
 
@@ -64,6 +51,7 @@ while :; do
 	./picoarch &> ./picoarch.txt
 	sync
 	
+	# launch Commander ----------------------------------------
 	if [ -f /tmp/commander ]; then
 		rm /tmp/commander
 		if [ -f /mnt/SDCARD/Apps/Commander/launch.sh ]; then

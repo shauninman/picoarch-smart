@@ -1,0 +1,7 @@
+#!/bin/sh
+
+MIN_BRIGHT=30 # 10 is actual min
+MAX_BRIGHT=255
+BRIGHT=$(cat /mnt/UDISK/system.json | jsonfilter -e "@.brightness")
+BRIGHT=$(( $BRIGHT * ($MAX_BRIGHT-$MIN_BRIGHT) / 10 + $MIN_BRIGHT ))
+iodisp 0 $BRIGHT
